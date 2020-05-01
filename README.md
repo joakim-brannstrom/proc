@@ -33,3 +33,61 @@ dub build -b release
 
 Done! Have fun.
 Don't be shy to report any issue that you find.
+
+# Examples
+
+This is a couple of examples of how the library can be used.
+
+A sandbox is in this library a way of assuring that any subprocesses that that
+are spawned have are also killed when the *root* is terminated. This is most
+probably used in conjunction with *timeout*.
+
+```d
+auto p = pipeProcess([scriptName]).sandbox.scopeKill;
+// do stuff. force a kill
+p.kill;
+```
+
+To kill a process after a timeout.
+
+```d
+auto p = pipeProcess(["sleep", "1m"]).timeout(100.dur!"msecs").scopeKill;
+// do stuff. the timeout triggers
+p.wait; // the exit code of the root process
+```
+
+And then to combine both of them.
+
+```d
+auto p = pipeProcess([script]).sandbox.timeout(1.dur!"seconds").scopeKill;
+// do stuff
+p.wait; // the exit code of the root process
+```
+
+To drain all output from a process by line. The element returned have an
+attribute, `type`, which allow you to see if it is `stdout` or `stderr`. Of
+note is that the draining is conservative and thus any non-valid UTF8 will
+result in a large part of the output being discarded. Pull requests to improve
+this is welcome.
+
+```d
+auto p = pipeProcess(["dd", "if=/dev/zero", "bs=10", "count=3"]).scopeKill;
+foreach (l; p.process.drainByLineCopy(100.dur!"msecs").filter!"!a.empty")
+    writeln(l);
+```
+
+The draining by line do have an overhead. Use the basic drain if you do not need it to be exactly by line.
+
+```d
+auto p = pipeProcess(["dd", "if=/dev/zero", "bs=10", "count=3"]).scopeKill;
+foreach (l; p.process.drain(100.dur!"msecs").filter!"!a.empty")
+    writeln(l);
+```
+
+The final is a combination of all the separate wheels.
+
+```d
+auto p = pipeProcess(["proc"]).sandbox.timeout(1.dur!"seconds").scopeKill;
+foreach (l; p.process.drain(100.dur!"msecs").filter!"!a.empty")
+    writeln(l);
+```
