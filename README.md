@@ -76,7 +76,8 @@ foreach (l; p.process.drainByLineCopy(100.dur!"msecs").filter!"!a.empty")
     writeln(l);
 ```
 
-The draining by line do have an overhead. Use the basic drain if you do not need it to be exactly by line.
+The draining by line do have an overhead. Use the basic drain if you do not
+need it to be exactly by line.
 
 ```d
 auto p = pipeProcess(["dd", "if=/dev/zero", "bs=10", "count=3"]).scopeKill;
@@ -90,4 +91,29 @@ The final is a combination of all the separate wheels.
 auto p = pipeProcess(["proc"]).sandbox.timeout(1.dur!"seconds").scopeKill;
 foreach (l; p.process.drain(100.dur!"msecs").filter!"!a.empty")
     writeln(l);
+```
+
+The library have functionality to analyze all running processes and present
+them in an easily digested format. To create such a map:
+
+```d
+auto t = makePidMap();
+```
+
+Lets say you want to kill all subtrees of the init process that are owned by the current user:
+
+```d
+auto pmap = makePidMap().filterByCurrentUser;
+foreach (ref t; pmap.splitToSubMaps) {
+    reap(proc.kill(t));
+}
+```
+
+Or maybe you just want to print the whole tree:
+
+```d
+auto pmap = makePidMap().filterByCurrentUser;
+foreach (p; pmap.pids) {
+    writefln("  pid:%s %s", p.to!string, pmap.getProc(p));
+}
 ```
