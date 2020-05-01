@@ -38,8 +38,8 @@ Don't be shy to report any issue that you find.
 
 This is a couple of examples of how the library can be used.
 
-A sandbox is in this library a way of assuring that any subprocesses that that
-are spawned have are also killed when the *root* is terminated. This is most
+A sandbox is in this library a way of assuring that any subprocesses that are
+spawned have are also killed when the *root* is terminated. This is most
 probably used in conjunction with *timeout*.
 
 ```d
@@ -66,7 +66,7 @@ p.wait; // the exit code of the root process
 
 To drain all output from a process by line. The element returned have an
 attribute, `type`, which allow you to see if it is `stdout` or `stderr`. Of
-note is that the draining is conservative and thus any non-valid UTF8 will
+note is that the draining is conservative and thus any non-valid UTF-8 will
 result in a large part of the output being discarded. Pull requests to improve
 this is welcome.
 
@@ -121,7 +121,7 @@ foreach (p; pmap.pids) {
 # Caveat
 
 Depending on the order of the operations the behavior will be different because
-an operation **may** traverse from the child upp to the root. As an example
+an operation **may** traverse from the child up to the root. As an example
 lets consider the combination of timeout and sandbox. The `kill` method of the
 sandbox will kill all children while the `kill` of the timeout will only kill
 the root process. This mean that the combination
@@ -130,7 +130,8 @@ the root process. This mean that the combination
 auto p = pipeProcess([script]).sandbox.timeout(1.dur!"seconds").scopeKill;
 ```
 
-will kill the root and all children if `timeout` triggers. Timeout calls `kill` of the sandox. The reverse though
+will kill the root and all children if `timeout` triggers. Timeout calls `kill`
+of the sandox. The reverse though
 
 ```d
 auto p = pipeProcess([script]).timeout(1.dur!"seconds").sandbox.scopeKill;
