@@ -1,4 +1,4 @@
-# proc
+# proc [![Build Status](https://dev.azure.com/wikodes/wikodes/_apis/build/status/joakim-brannstrom.proc?branchName=master)](https://dev.azure.com/wikodes/wikodes/_build/latest?definitionId=10&branchName=master)
 
 **proc** is a library to run single processes and manage trees of them. It
 provides conveniences such as timeouts, output drains and sandboxing for single
