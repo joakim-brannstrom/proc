@@ -117,3 +117,26 @@ foreach (p; pmap.pids) {
     writefln("  pid:%s %s", p.to!string, pmap.getProc(p));
 }
 ```
+
+# Caveat
+
+Depending on the order of the operations the behavior will be different because
+an operation **may** traverse from the child upp to the root. As an example
+lets consider the combination of timeout and sandbox. The `kill` method of the
+sandbox will kill all children while the `kill` of the timeout will only kill
+the root process. This mean that the combination
+
+```d
+auto p = pipeProcess([script]).sandbox.timeout(1.dur!"seconds").scopeKill;
+```
+
+will kill the root and all children if `timeout` triggers. Timeout calls `kill` of the sandox. The reverse though
+
+```d
+auto p = pipeProcess([script]).timeout(1.dur!"seconds").sandbox.scopeKill;
+```
+
+mean that the timeout will only kill the root process if it triggers.
+
+The library try not to assume too much about the expected use. How it should
+behave is left up to the user of the library.
