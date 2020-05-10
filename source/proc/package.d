@@ -865,11 +865,15 @@ struct DrainByLineCopyRange(ProcessT) {
         }
 
         size_t idx;
-        do {
-            fillBuf();
-            idx = buf.countUntil('\n');
-        }
-        while (!range.empty && idx == -1);
+        () {
+            int cnt;
+            do {
+                fillBuf();
+                idx = buf.countUntil('\n');
+                // 10 is a magic number which mean that it at most wait 10x timeout for data
+            }
+            while (!range.empty && idx == -1 && cnt++ < 10);
+        }();
 
         const(ubyte)[] tmp;
         if (buf.empty) {
