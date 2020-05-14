@@ -7,6 +7,9 @@ license "BSL-1.0"
 targetPath "build"
 targetType "library"
 
+configuration "library" {
+}
+
 configuration "unittest" {
     dependency "unit-threaded" version="~>0.10"
     targetType "executable"
