@@ -750,25 +750,32 @@ struct DrainRange(ProcessT) {
         }
 
         void waitUntilData() @safe {
+            import std.datetime : Clock;
+
             // may livelock if the process never terminates and never writes to
             // the terminal. waitTime ensure that it sooner or later is
             // interrupted. It lets e.g the timeout handling to kill the
             // process.
             const s = 20.dur!"msecs";
-            Duration waitTime;
-            while (waitTime < timeout) {
-                import core.thread : Thread;
-                import core.time : dur;
+            const stopAt = Clock.currTime + timeout;
+            const useSleep = Clock.currTime + timeout / 2;
+            bool running = true;
+            while (running) {
+                const now = Clock.currTime;
+
+                running = now < stopAt;
 
                 readData();
-                if (front_.data.empty) {
+
+                if (now > useSleep && front_.data.empty) {
+                    import core.thread : Thread;
+
                     () @trusted { Thread.sleep(s); }();
-                    waitTime += s;
                 }
 
                 if (!(bufRead.empty && isAnyPipeOpen)) {
                     front_.data = bufRead.dup;
-                    break;
+                    running = false;
                 }
             }
         }
@@ -960,7 +967,8 @@ unittest {
     auto p = pipeProcess(["dd", "if=/dev/zero", "bs=10", "count=3"]).scopeKill;
     auto res = p.process.drainByLineCopy(1.dur!"minutes").filter!"!a.empty".array;
 
-    res.length.shouldEqual(4);
+    writeln(res);
+    res.length.shouldEqual(3);
     res.joiner.count.shouldBeGreaterThan(30);
     p.wait.shouldEqual(0);
     p.terminated.shouldBeTrue;
