@@ -713,18 +713,15 @@ struct DrainRange(ProcessT) {
             empty,
         }
 
-        Duration timeout;
         ProcessT p;
         DrainElement front_;
         State st;
         ubyte[] buf;
-        ubyte[] bufRead;
     }
 
-    this(ProcessT p, Duration timeout) {
+    this(ProcessT p) {
         this.p = p;
         this.buf = new ubyte[4096];
-        this.timeout = timeout;
     }
 
     DrainElement front() @safe pure nothrow const @nogc {
@@ -735,85 +732,78 @@ struct DrainRange(ProcessT) {
     void popFront() @safe {
         assert(!empty, "Can't pop front of an empty range");
 
-        bool isAnyPipeOpen() {
-            return (p.pipe.hasData || p.stderr.hasData) && !p.terminated;
+        static bool isAnyPipeOpen(ref ProcessT p) {
+            return p.pipe.isOpen || p.stderr.isOpen;
         }
 
-        void readData() @safe {
-            if (p.stderr.hasData && p.stderr.hasPendingData) {
-                front_ = DrainElement(DrainElement.Type.stderr);
-                bufRead = p.stderr.read(buf);
-            } else if (p.pipe.hasData && p.pipe.hasPendingData) {
-                front_ = DrainElement(DrainElement.Type.stdout);
-                bufRead = p.pipe.read(buf);
+        DrainElement readData(ref ProcessT p) @safe {
+            if (p.stderr.hasPendingData) {
+                return DrainElement(DrainElement.Type.stderr, p.stderr.read(buf));
+            } else if (p.pipe.hasPendingData) {
+                return DrainElement(DrainElement.Type.stdout, p.pipe.read(buf));
             }
+            return DrainElement.init;
         }
 
-        void waitUntilData() @safe {
+        DrainElement waitUntilData() @safe {
             import std.datetime : Clock;
 
             // may livelock if the process never terminates and never writes to
-            // the terminal. waitTime ensure that it sooner or later is
-            // interrupted. It lets e.g the timeout handling to kill the
-            // process.
-            const s = 20.dur!"msecs";
+            // the terminal. timeout ensure that it sooner or later is break
+            // the loop. This is important if the drain is part of a timeout
+            // wrapping.
+
+            const timeout = 100.dur!"msecs";
             const stopAt = Clock.currTime + timeout;
-            const useSleep = Clock.currTime + timeout / 2;
+            const sleepFor = timeout / 20;
+            const useSleep = Clock.currTime + sleepFor;
             bool running = true;
             while (running) {
                 const now = Clock.currTime;
 
-                running = now < stopAt;
+                running = (now < stopAt) && isAnyPipeOpen(p);
 
-                readData();
+                auto bufRead = readData(p);
 
-                if (now > useSleep && front_.data.empty) {
+                if (!bufRead.empty) {
+                    return DrainElement(bufRead.type, bufRead.data.dup);
+                } else if (running && now > useSleep && bufRead.empty) {
                     import core.thread : Thread;
 
-                    () @trusted { Thread.sleep(s); }();
-                }
-
-                if (!(bufRead.empty && isAnyPipeOpen)) {
-                    front_.data = bufRead.dup;
-                    running = false;
+                    () @trusted { Thread.sleep(sleepFor); }();
                 }
             }
+
+            return DrainElement.init;
         }
 
         front_ = DrainElement.init;
-        bufRead = null;
 
         final switch (st) {
         case State.start:
             st = State.draining;
-            waitUntilData;
+            front_ = waitUntilData;
             break;
         case State.draining:
-            if (isAnyPipeOpen) {
-                waitUntilData();
+            if (p.terminated) {
+                st = State.lastStdout;
+            } else if (isAnyPipeOpen(p)) {
+                front_ = waitUntilData();
             } else {
                 st = State.lastStdout;
             }
             break;
         case State.lastStdout:
-            if (p.pipe.hasData && p.pipe.hasPendingData) {
-                front_ = DrainElement(DrainElement.Type.stdout);
-                bufRead = p.pipe.read(buf);
-            }
-
-            front_.data = bufRead.dup;
-            if (!p.pipe.hasData || p.terminated) {
+            if (p.pipe.hasPendingData) {
+                front_ = DrainElement(DrainElement.Type.stdout, p.pipe.read(buf).dup);
+            } else {
                 st = State.lastStderr;
             }
             break;
         case State.lastStderr:
-            if (p.stderr.hasData && p.stderr.hasPendingData) {
-                front_ = DrainElement(DrainElement.Type.stderr);
-                bufRead = p.stderr.read(buf);
-            }
-
-            front_.data = bufRead.dup;
-            if (!p.stderr.hasData || p.terminated) {
+            if (p.stderr.hasPendingData) {
+                front_ = DrainElement(DrainElement.Type.stderr, p.stderr.read(buf).dup);
+            } else {
                 st = State.lastElement;
             }
             break;
@@ -831,8 +821,8 @@ struct DrainRange(ProcessT) {
 }
 
 /// Drain a process pipe until empty.
-auto drain(T)(T p, Duration timeout) {
-    return DrainRange!T(p, timeout);
+auto drain(T)(T p) {
+    return DrainRange!T(p);
 }
 
 /// Read the data from a ReadChannel by line.
@@ -853,9 +843,9 @@ struct DrainByLineCopyRange(ProcessT) {
         const(char)[] line;
     }
 
-    this(ProcessT p, Duration timeout) @safe {
+    this(ProcessT p) @safe {
         process = p;
-        range = p.drain(timeout);
+        range = p.drain;
     }
 
     string front() @trusted pure nothrow const @nogc {
@@ -911,9 +901,9 @@ struct DrainByLineCopyRange(ProcessT) {
                 do {
                     fillBuf();
                     idx = buf.countUntil('\n');
-                    // 10 is a magic number which mean that it at most wait 10x timeout for data
+                    // 2 is a magic number which mean that it at most wait 2x timeout for data
                 }
-                while (!range.empty && idx == -1 && cnt++ < 10);
+                while (!range.empty && idx == -1 && cnt++ < 2);
             }();
 
             auto tmp = updateBuf(idx);
@@ -965,29 +955,28 @@ unittest {
     import std.array : array;
 
     auto p = pipeProcess(["dd", "if=/dev/zero", "bs=10", "count=3"]).scopeKill;
-    auto res = p.process.drainByLineCopy(1.dur!"minutes").filter!"!a.empty".array;
+    auto res = p.process.drainByLineCopy.filter!"!a.empty".array;
 
-    writeln(res);
     res.length.shouldEqual(3);
     res.joiner.count.shouldBeGreaterThan(30);
     p.wait.shouldEqual(0);
     p.terminated.shouldBeTrue;
 }
 
-auto drainByLineCopy(T)(T p, Duration timeout) @safe {
-    return DrainByLineCopyRange!T(p, timeout);
+auto drainByLineCopy(T)(T p) @safe {
+    return DrainByLineCopyRange!T(p);
 }
 
 /// Drain the process output until it is done executing.
-auto drainToNull(T)(T p, Duration timeout) @safe {
-    foreach (l; p.drain(timeout)) {
+auto drainToNull(T)(T p) @safe {
+    foreach (l; p.drain()) {
     }
     return p;
 }
 
 /// Drain the output from the process into an output range.
-auto drain(ProcessT, T)(ProcessT p, ref T range, Duration timeout) {
-    foreach (l; p.drain(timeout)) {
+auto drain(ProcessT, T)(ProcessT p, ref T range) {
+    foreach (l; p.drain()) {
         range.put(l);
     }
     return p;
@@ -996,7 +985,7 @@ auto drain(ProcessT, T)(ProcessT p, ref T range, Duration timeout) {
 @("shall drain the output of a process while it is running with a separation of stdout and stderr")
 unittest {
     auto p = pipeProcess(["dd", "if=/dev/urandom", "bs=10", "count=3"]).scopeKill;
-    auto res = p.process.drain(1.dur!"minutes").array;
+    auto res = p.process.drain.array;
 
     // this is just a sanity check. It has to be kind a high because there is
     // some wiggleroom allowed
@@ -1023,7 +1012,7 @@ sleep 10m
     auto p = pipeProcess([script]).sandbox.timeout(1.dur!"seconds").scopeKill;
     waitUntilChildren(p.osHandle, 1);
     const preChildren = makePidMap.getSubMap(p.osHandle).remove(p.osHandle).length;
-    const res = p.process.drain(1.dur!"minutes").array;
+    const res = p.process.drain.array;
     const postChildren = makePidMap.getSubMap(p.osHandle).remove(p.osHandle).length;
 
     p.wait.shouldEqual(-9);
