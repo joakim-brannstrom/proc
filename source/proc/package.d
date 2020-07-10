@@ -906,8 +906,10 @@ struct DrainByLineCopyRange(ProcessT) {
                 while (!range.empty && idx == -1 && cnt++ < 2);
             }();
 
-            auto tmp = updateBuf(idx);
-            line = std.utf.byUTF!(const(char))(cast(const(char)[]) tmp).array;
+            if (idx != -1) {
+                auto tmp = updateBuf(idx);
+                line = std.utf.byUTF!(const(char))(cast(const(char)[]) tmp).array;
+            }
         }
 
         bool lastLine() {
