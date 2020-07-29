@@ -18,12 +18,3 @@ configuration "unittest" {
     preBuildCommands "dub run unit-threaded -c gen_ut_main -- -f build/ut.d"
     excludedSourceFiles "source/app.d"
 }
-
-// redirect testing which is primarily integration testing
-//configuration "integration_test" {
-//    targetType "executable"
-//    targetName "integration_test"
-//
-//    excludedSourceFiles "source/*"
-//    sourceFiles "test/redirect.d"
-//}
