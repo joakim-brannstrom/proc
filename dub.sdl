@@ -11,7 +11,7 @@ configuration "library" {
 }
 
 configuration "unittest" {
-    dependency "unit-threaded" version="~>0.10"
+    dependency "unit-threaded" version="~>1.0.4"
     targetType "executable"
     targetName "unittest"
     mainSourceFile "build/ut.d"
