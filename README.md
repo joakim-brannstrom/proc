@@ -72,7 +72,7 @@ this is welcome.
 
 ```d
 auto p = pipeProcess(["dd", "if=/dev/zero", "bs=10", "count=3"]).scopeKill;
-foreach (l; p.process.drainByLineCopy(100.dur!"msecs").filter!"!a.empty")
+foreach (l; p.process.drainByLineCopy.filter!"!a.empty")
     writeln(l);
 ```
 
@@ -81,7 +81,7 @@ need it to be exactly by line.
 
 ```d
 auto p = pipeProcess(["dd", "if=/dev/zero", "bs=10", "count=3"]).scopeKill;
-foreach (l; p.process.drain(100.dur!"msecs").filter!"!a.empty")
+foreach (l; p.process.drain.filter!"!a.empty")
     writeln(l);
 ```
 
@@ -89,7 +89,7 @@ The final is a combination of all the separate wheels.
 
 ```d
 auto p = pipeProcess(["proc"]).sandbox.timeout(1.dur!"seconds").scopeKill;
-foreach (l; p.process.drain(100.dur!"msecs").filter!"!a.empty")
+foreach (l; p.process.drain.filter!"!a.empty")
     writeln(l);
 ```
 
