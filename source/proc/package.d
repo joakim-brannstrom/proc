@@ -16,6 +16,8 @@ import std.typecons : Flag, Yes;
 static import std.process;
 static import std.stdio;
 
+import my.gc.refc;
+
 public import proc.channel;
 public import proc.pid;
 
@@ -24,17 +26,29 @@ version (unittest) {
     import std.file : remove;
 }
 
-/// Automatically terminate the process when it goes out of scope.
-auto scopeKill(T)(T p) {
-    return ScopeKill!T(p);
+/** Manage a process by reference counting so that it is terminated when the it
+ * stops being used such as the instance going out of scope.
+ */
+auto rcKill(T)(T p) {
+    return refCounted(ScopeKill!T(p));
 }
+
+// backward compatibility.
+alias scopeKill = rcKill;
 
 struct ScopeKill(T) {
     T process;
     alias process this;
+    private bool hasProcess;
+
+    this(T process) {
+        this.process = process;
+        this.hasProcess = true;
+    }
 
     ~this() {
-        process.dispose();
+        if (hasProcess)
+            process.dispose();
     }
 }
 
@@ -431,7 +445,7 @@ sleep 10m
     scope (exit)
         remove(scriptName);
 
-    auto p = pipeProcess([scriptName]).sandbox.scopeKill;
+    auto p = pipeProcess([scriptName]).sandbox.rcKill;
     waitUntilChildren(p.osHandle, 3);
     const preChildren = makePidMap.getSubMap(p.osHandle).remove(p.osHandle).length;
     p.kill;
@@ -666,7 +680,7 @@ void waitForPendingData(ProcessT)(Process p) {
 unittest {
     import std.datetime.stopwatch : StopWatch, AutoStart;
 
-    auto p = pipeProcess(["sleep", "1m"]).timeout(100.dur!"msecs").scopeKill;
+    auto p = pipeProcess(["sleep", "1m"]).timeout(100.dur!"msecs").rcKill;
     auto sw = StopWatch(AutoStart.yes);
     p.wait;
     sw.stop;
@@ -958,7 +972,7 @@ unittest {
     import std.algorithm : filter, joiner, map;
     import std.array : array;
 
-    auto p = pipeProcess(["dd", "if=/dev/zero", "bs=10", "count=3"]).scopeKill;
+    auto p = pipeProcess(["dd", "if=/dev/zero", "bs=10", "count=3"]).rcKill;
     auto res = p.process.drainByLineCopy.filter!"!a.empty".array;
 
     res.length.shouldEqual(3);
@@ -988,8 +1002,8 @@ auto drain(ProcessT, T)(ProcessT p, ref T range) {
 
 @("shall drain the output of a process while it is running with a separation of stdout and stderr")
 unittest {
-    auto p = pipeProcess(["dd", "if=/dev/urandom", "bs=10", "count=3"]).scopeKill;
-    auto res = p.process.drain.array;
+    auto p = pipeProcess(["dd", "if=/dev/urandom", "bs=10", "count=3"]).rcKill;
+    auto res = p.drain.array;
 
     // this is just a sanity check. It has to be kind a high because there is
     // some wiggleroom allowed
@@ -1013,7 +1027,7 @@ sleep 10m
     scope (exit)
         remove(script);
 
-    auto p = pipeProcess([script]).sandbox.timeout(1.dur!"seconds").scopeKill;
+    auto p = pipeProcess([script]).sandbox.timeout(1.dur!"seconds").rcKill;
     waitUntilChildren(p.osHandle, 1);
     const preChildren = makePidMap.getSubMap(p.osHandle).remove(p.osHandle).length;
     const res = p.process.drain.array;
