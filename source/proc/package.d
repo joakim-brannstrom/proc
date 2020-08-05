@@ -350,7 +350,7 @@ PipeProcess pipeShell(scope const(char)[] command,
 /** Moves the process to a separate process group and on exit kill it and all
  * its children.
  */
-struct Sandbox(ProcessT) {
+@safe struct Sandbox(ProcessT) {
     private {
         ProcessT p;
         RawPid pid;
@@ -446,7 +446,7 @@ sleep 10m
 
 /** dispose the process after the timeout.
  */
-struct Timeout(ProcessT) {
+@safe struct Timeout(ProcessT) {
     import std.algorithm : among;
     import std.datetime : Clock, Duration;
     import core.thread;
@@ -569,7 +569,7 @@ struct Timeout(ProcessT) {
 
             final switch (msg) {
             case Msg.none:
-                Thread.sleep(sleepInterval);
+                () @trusted { Thread.sleep(sleepInterval); }();
                 break;
             case Msg.stop:
                 forceStop = true;
@@ -580,9 +580,11 @@ struct Timeout(ProcessT) {
                 break;
             }
 
-            if (core.sys.posix.signal.kill(p, 0) == -1) {
-                running = false;
-            }
+            () @trusted {
+                if (core.sys.posix.signal.kill(p, 0) == -1) {
+                    running = false;
+                }
+            }();
         }
 
         // may be children alive thus must ensure that the whole process tree
@@ -843,7 +845,7 @@ struct DrainByLineCopyRange(ProcessT) {
         const(char)[] line;
     }
 
-    this(ProcessT p) @safe {
+    this(ProcessT p) {
         process = p;
         range = p.drain;
     }
@@ -965,12 +967,12 @@ unittest {
     p.terminated.shouldBeTrue;
 }
 
-auto drainByLineCopy(T)(T p) @safe {
+auto drainByLineCopy(T)(T p) {
     return DrainByLineCopyRange!T(p);
 }
 
 /// Drain the process output until it is done executing.
-auto drainToNull(T)(T p) @safe {
+auto drainToNull(T)(T p) {
     foreach (l; p.drain()) {
     }
     return p;
