@@ -40,12 +40,12 @@ struct ScopeKill(T) {
     alias process this;
     private bool hasProcess;
 
-    this(T process) {
+    this(T process) @safe {
         this.process = process;
         this.hasProcess = true;
     }
 
-    ~this() {
+    ~this() @safe {
         if (hasProcess)
             process.dispose();
     }
@@ -71,6 +71,9 @@ struct SpawnProcess {
     this(std.process.Pid process) @safe {
         this.process = process;
         this.pid = process.osHandle.RawPid;
+    }
+
+    ~this() @safe {
     }
 
     /// Returns: The raw OS handle for the process ID.
@@ -463,7 +466,6 @@ sleep 10m
     import std.algorithm : among;
     import std.datetime : Clock, Duration;
     import core.thread;
-    import std.typecons : RefCounted, refCounted;
 
     private {
         enum Msg {
@@ -497,6 +499,10 @@ sleep 10m
         rc.background = new Background(&rc.p, timeout);
         rc.background.isDaemon = true;
         rc.background.start;
+    }
+
+    ~this() @trusted {
+        rc.release;
     }
 
     private static class Background : Thread {
