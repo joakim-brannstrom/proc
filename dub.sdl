@@ -7,7 +7,7 @@ license "BSL-1.0"
 targetPath "build"
 targetType "library"
 
-dependency "my" version="~>0.0.5"
+dependency "my" version="~>0.0.6"
 
 configuration "library" {
 }
