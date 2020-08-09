@@ -7,16 +7,13 @@ license "BSL-1.0"
 targetPath "build"
 targetType "library"
 
-dependency "my" version="~>0.0.6"
+dependency "my" version="~>0.0.8"
+
+dflags "-verrors=context"
 
 configuration "library" {
 }
 
 configuration "unittest" {
-    dependency "unit-threaded" version="~>1.0.4"
-    targetType "executable"
-    targetName "unittest"
-    mainSourceFile "build/ut.d"
-    preBuildCommands "dub run unit-threaded -c gen_ut_main -- -f build/ut.d"
-    excludedSourceFiles "source/app.d"
+    dependency "silly" version="~>1.0.2"
 }

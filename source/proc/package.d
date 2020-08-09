@@ -22,7 +22,6 @@ public import proc.channel;
 public import proc.pid;
 
 version (unittest) {
-    import unit_threaded.assertions;
     import std.file : remove;
 }
 
@@ -452,10 +451,10 @@ sleep 10m
     Thread.sleep(500.dur!"msecs"); // wait for the OS to kill the children
     const postChildren = makePidMap.getSubMap(p.osHandle).remove(p.osHandle).length;
 
-    p.wait.shouldEqual(-9);
-    p.terminated.shouldBeTrue;
-    preChildren.shouldEqual(3);
-    postChildren.shouldEqual(0);
+    assert(p.wait == -9);
+    assert(p.terminated);
+    assert(preChildren == 3);
+    assert(postChildren == 0);
 }
 
 /** dispose the process after the timeout.
@@ -685,12 +684,12 @@ unittest {
     p.wait;
     sw.stop;
 
-    sw.peek.shouldBeGreaterThan(100.dur!"msecs");
-    sw.peek.shouldBeSmallerThan(500.dur!"msecs");
-    p.wait.shouldEqual(-9);
-    p.terminated.shouldBeTrue;
-    p.status.shouldEqual(-9);
-    p.timeoutTriggered.shouldBeTrue;
+    assert(sw.peek >= 100.dur!"msecs");
+    assert(sw.peek <= 500.dur!"msecs");
+    assert(p.wait == -9);
+    assert(p.terminated);
+    assert(p.status == -9);
+    assert(p.timeoutTriggered);
 }
 
 struct DrainElement {
@@ -975,10 +974,10 @@ unittest {
     auto p = pipeProcess(["dd", "if=/dev/zero", "bs=10", "count=3"]).rcKill;
     auto res = p.process.drainByLineCopy.filter!"!a.empty".array;
 
-    res.length.shouldEqual(3);
-    res.joiner.count.shouldBeGreaterThan(30);
-    p.wait.shouldEqual(0);
-    p.terminated.shouldBeTrue;
+    assert(res.length == 3);
+    assert(res.joiner.count >= 30);
+    assert(p.wait == 0);
+    assert(p.terminated);
 }
 
 auto drainByLineCopy(T)(T p) {
@@ -1007,16 +1006,15 @@ unittest {
 
     // this is just a sanity check. It has to be kind a high because there is
     // some wiggleroom allowed
-    res.count.shouldBeSmallerThan(50);
+    assert(res.count <= 50);
 
-    res.filter!(a => a.type == DrainElement.Type.stdout)
-        .map!(a => a.data)
-        .joiner
-        .count
-        .shouldEqual(30);
-    res.filter!(a => a.type == DrainElement.Type.stderr).count.shouldBeGreaterThan(0);
-    p.wait.shouldEqual(0);
-    p.terminated.shouldBeTrue;
+    assert(res.filter!(a => a.type == DrainElement.Type.stdout)
+            .map!(a => a.data)
+            .joiner
+            .count == 30);
+    assert(res.filter!(a => a.type == DrainElement.Type.stderr).count == 0);
+    assert(p.wait == 0);
+    assert(p.terminated);
 }
 
 @("shall kill the process tree when the timeout is reached")
@@ -1033,10 +1031,10 @@ sleep 10m
     const res = p.process.drain.array;
     const postChildren = makePidMap.getSubMap(p.osHandle).remove(p.osHandle).length;
 
-    p.wait.shouldEqual(-9);
-    p.terminated.shouldBeTrue;
-    preChildren.shouldEqual(1);
-    postChildren.shouldEqual(0);
+    assert(p.wait == -9);
+    assert(p.terminated);
+    assert(preChildren == 1);
+    assert(postChildren == 0);
 }
 
 string makeScript(string script, string file = __FILE__, uint line = __LINE__) {
