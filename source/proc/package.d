@@ -621,12 +621,16 @@ sleep 10m
         return rc.pid;
     }
 
-    ref Pipe pipe() nothrow @trusted {
-        return rc.p.pipe;
+    static if (__traits(hasMember, ProcessT, "pipe")) {
+        ref Pipe pipe() nothrow @trusted {
+            return rc.p.pipe;
+        }
     }
 
-    ref FileReadChannel stderr() nothrow @trusted {
-        return rc.p.stderr;
+    static if (__traits(hasMember, ProcessT, "stderr")) {
+        ref FileReadChannel stderr() nothrow @trusted {
+            return rc.p.stderr;
+        }
     }
 
     void dispose() @trusted {
