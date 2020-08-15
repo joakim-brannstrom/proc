@@ -126,10 +126,12 @@ struct PidMap {
         }
         children.remove(p);
 
-        if (auto children_ = parent[p] in children) {
-            (*children_) = (*children_).filter!(a => a != p).array;
+        if (p in parent) {
+            if (auto children_ = parent[p] in children) {
+                (*children_) = (*children_).filter!(a => a != p).array;
+            }
+            parent.remove(p);
         }
-        parent.remove(p);
 
         return this;
     }
