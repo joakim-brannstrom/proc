@@ -9,7 +9,8 @@ targetType "library"
 
 dependency "my" version="~>0.0.9"
 
-dflags "-verrors=context"
+dflags "-verrors=context" platform="dmd"
+dflags "--verrors-context" platform="ldc"
 
 configuration "library" {
 }
