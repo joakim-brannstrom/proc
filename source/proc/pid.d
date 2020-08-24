@@ -16,8 +16,9 @@ import std.path;
 import std.range : iota;
 import std.stdio : File, writeln, writefln;
 import std.typecons : Nullable, NullableRef, Tuple, tuple, Flag;
-
 import core.sys.posix.sys.types : uid_t;
+
+static import core.sys.posix.signal;
 
 @safe:
 
@@ -219,12 +220,10 @@ struct PidMap {
  *
  * TODO: remove @trusted when upgrading the minimum compiler >2.091.0
  */
-RawPid[] kill(PidMap pmap, Flag!"onlyCurrentUser" user) @trusted nothrow {
-    static import core.sys.posix.signal;
-
-    static void killMap(RawPid[] pids) @trusted nothrow {
+RawPid[] kill(PidMap pmap, Flag!"onlyCurrentUser" user, int signal = core.sys.posix.signal.SIGKILL) @trusted nothrow {
+    static void killMap(RawPid[] pids, int signal) @trusted nothrow {
         foreach (const c; pids) {
-            core.sys.posix.signal.kill(c, core.sys.posix.signal.SIGKILL);
+            core.sys.posix.signal.kill(c, signal);
         }
     }
 
@@ -235,7 +234,7 @@ RawPid[] kill(PidMap pmap, Flag!"onlyCurrentUser" user) @trusted nothrow {
         toKill = toKill[1 .. $];
 
         auto pids = f.pids;
-        killMap(pids);
+        killMap(pids, signal);
         rval.put(pids);
 
         pmap = () {

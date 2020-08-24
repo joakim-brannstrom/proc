@@ -7,7 +7,7 @@ license "BSL-1.0"
 targetPath "build"
 targetType "library"
 
-dependency "my" version="~>0.0.9"
+dependency "my" version="~>0.0.15"
 
 dflags "-verrors=context" platform="dmd"
 dflags "--verrors-context" platform="ldc"
@@ -17,4 +17,5 @@ configuration "library" {
 
 configuration "unittest" {
     dependency "silly" version="~>1.0.2"
+    dependency "beep" version="~>0.0.2"
 }
