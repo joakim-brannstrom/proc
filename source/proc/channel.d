@@ -120,6 +120,11 @@ struct FileReadChannel {
 
         return buf[0 .. res];
     }
+
+    /// Flush the input.
+    void flush() @safe {
+        in_.flush();
+    }
 }
 
 /** IO channel via `File` objects.
