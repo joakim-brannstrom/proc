@@ -8,55 +8,13 @@ module proc.channel;
 import logger = std.experimental.logger;
 import std.stdio : File;
 
-/** Pipes to use to communicate with a process.
- *
- * Can be used to directly communicate via stdin/stdout if so is desired.
- */
-struct Pipe {
-    FileReadChannel input;
-    FileWriteChannel output;
-
-    this(File input, File output) @safe {
-        this.input = FileReadChannel(input);
-        this.output = FileWriteChannel(output);
-    }
-
-    bool isOpen() @safe {
-        return input.isOpen;
-    }
-
-    /// If there is data to read.
-    bool hasPendingData() @safe {
-        return input.hasPendingData;
-    }
-
-    const(ubyte)[] read(const size_t s) return scope @safe {
-        return input.read(s);
-    }
-
-    ubyte[] read(ref ubyte[] buf) @safe {
-        return input.read(buf);
-    }
-
-    void write(scope const(ubyte)[] data) @safe {
-        output.write(data);
-    }
-
-    void flush() @safe {
-        output.flush;
-    }
-
-    void closeWrite() @safe {
-        output.closeWrite;
-    }
-}
-
 /** A read channel over a `File` object.
  */
 struct FileReadChannel {
     private {
         File in_;
         enum State {
+            none,
             active,
             hup,
             eof
@@ -67,11 +25,12 @@ struct FileReadChannel {
 
     this(File in_) @trusted {
         this.in_ = in_;
+        this.st = State.active;
     }
 
     /// If the channel is open.
     bool isOpen() @safe {
-        return st != State.eof;
+        return st != State.eof && st != State.none;
     }
 
     /** If there is data to read, non blocking.
@@ -170,8 +129,8 @@ struct FileReadChannel {
 struct FileWriteChannel {
     private File out_;
 
-    this(File out__) @safe {
-        out_ = out__;
+    this(File out_) @safe {
+        this.out_ = out_;
     }
 
     /** Write data to the output channel.
