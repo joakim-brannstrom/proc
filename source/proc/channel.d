@@ -135,11 +135,16 @@ struct FileWriteChannel {
 
     /** Write data to the output channel.
      *
-     * Throws:
-     * ErrnoException if the file is not opened or if the call to fwrite fails.
+     * Returns: the data that was written
      */
-    void write(scope const(ubyte)[] data) @safe {
-        out_.rawWrite(data);
+    const(ubyte)[] write(scope const(ubyte)[] data) @trusted {
+        static import core.sys.posix.unistd;
+
+        const res = core.sys.posix.unistd.write(out_.fileno, &data[0], data.length);
+        if (res <= 0) {
+            return null;
+        }
+        return data[0 .. res];
     }
 
     /// Flush the output.
