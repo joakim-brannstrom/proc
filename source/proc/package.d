@@ -22,6 +22,7 @@ import my.from_;
 
 public import proc.channel;
 public import proc.pid;
+public import proc.tty;
 
 version (unittest) {
     import std.file : remove;
