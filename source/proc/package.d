@@ -196,16 +196,26 @@ struct PipeProcess {
         }
 
         std.process.ProcessPipes process;
+        std.process.Pid pid;
+
         FileReadChannel stderr_;
         FileReadChannel stdout_;
         FileWriteChannel stdin_;
         int status_;
         State st;
-        RawPid pid;
+    }
+
+    this(std.process.Pid pid, File stdin, File stdout, File stderr) @safe {
+        this.pid = pid;
+
+        this.stdin_ = FileWriteChannel(stdin);
+        this.stdout_ = FileReadChannel(stdout);
+        this.stderr_ = FileReadChannel(stderr);
     }
 
     this(std.process.ProcessPipes process, std.process.Redirect r) @safe {
         this.process = process;
+        this.pid = process.pid;
 
         if (r & std.process.Redirect.stdin) {
             stdin_ = FileWriteChannel(this.process.stdin);
@@ -216,13 +226,11 @@ struct PipeProcess {
         if (r & std.process.Redirect.stderr) {
             this.stderr_ = FileReadChannel(this.process.stderr);
         }
-
-        this.pid = process.pid.osHandle.RawPid;
     }
 
     /// Returns: The raw OS handle for the process ID.
     RawPid osHandle() nothrow @safe {
-        return this.pid;
+        return pid.osHandle.RawPid;
     }
 
     /// Access to stdout.
@@ -275,7 +283,7 @@ struct PipeProcess {
         }
 
         try {
-            std.process.kill(process.pid, signal);
+            std.process.kill(pid, signal);
         } catch (Exception e) {
         }
 
@@ -287,10 +295,10 @@ struct PipeProcess {
     int wait() @safe {
         final switch (st) {
         case State.running:
-            status_ = std.process.wait(process.pid);
+            status_ = std.process.wait(pid);
             break;
         case State.terminated:
-            status_ = std.process.wait(process.pid);
+            status_ = std.process.wait(pid);
             break;
         case State.exitCode:
             break;
@@ -306,14 +314,14 @@ struct PipeProcess {
     bool tryWait() @safe {
         final switch (st) {
         case State.running:
-            auto s = std.process.tryWait(process.pid);
+            auto s = std.process.tryWait(pid);
             if (s.terminated) {
                 st = State.exitCode;
                 status_ = s.status;
             }
             break;
         case State.terminated:
-            status_ = std.process.wait(process.pid);
+            status_ = std.process.wait(pid);
             st = State.exitCode;
             break;
         case State.exitCode:

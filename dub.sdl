@@ -11,6 +11,7 @@ dependency "my" version="~>0.0.15"
 
 dflags "-verrors=context" platform="dmd"
 dflags "--verrors-context" platform="ldc"
+libs "util"
 
 configuration "library" {
 }

@@ -11,8 +11,9 @@ import std.stdio : File;
 /** A read channel over a `File` object.
  */
 struct FileReadChannel {
+    File file;
+
     private {
-        File in_;
         enum State {
             none,
             active,
@@ -23,8 +24,8 @@ struct FileReadChannel {
         State st;
     }
 
-    this(File in_) @trusted {
-        this.in_ = in_;
+    this(File file) @trusted {
+        this.file = file;
         this.st = State.active;
     }
 
@@ -49,7 +50,7 @@ struct FileReadChannel {
         }
 
         pollfd[1] fds;
-        fds[0].fd = in_.fileno;
+        fds[0].fd = file.fileno;
         fds[0].events = POLLIN;
         auto ready = () @trusted { return poll(&fds[0], 1, 0); }();
 
@@ -112,7 +113,7 @@ struct FileReadChannel {
             return null;
         }
 
-        const res = core.sys.posix.unistd.read(in_.fileno, &buf[0], buf.length);
+        const res = core.sys.posix.unistd.read(file.fileno, &buf[0], buf.length);
         if (res <= 0) {
             st = State.eof;
             return null;
@@ -123,7 +124,7 @@ struct FileReadChannel {
 
     /// Flush the input.
     void flush() @safe {
-        in_.flush();
+        file.flush();
     }
 }
 
@@ -132,10 +133,22 @@ struct FileReadChannel {
  * Useful when e.g. communicating over pipes.
  */
 struct FileWriteChannel {
-    private File out_;
+    File file;
 
-    this(File out_) @safe {
-        this.out_ = out_;
+    this(File file) @safe {
+        this.file = file;
+    }
+
+    const(ubyte)[] write(const(char)[] data_) @trusted {
+        static import core.sys.posix.unistd;
+
+        auto data = cast(const(ubyte)[]) data_;
+
+        const res = core.sys.posix.unistd.write(file.fileno, &data[0], data.length);
+        if (res <= 0) {
+            return null;
+        }
+        return data[0 .. res];
     }
 
     /** Write data to the output channel.
@@ -145,7 +158,7 @@ struct FileWriteChannel {
     const(ubyte)[] write(scope const(ubyte)[] data) @trusted {
         static import core.sys.posix.unistd;
 
-        const res = core.sys.posix.unistd.write(out_.fileno, &data[0], data.length);
+        const res = core.sys.posix.unistd.write(file.fileno, &data[0], data.length);
         if (res <= 0) {
             return null;
         }
@@ -154,12 +167,12 @@ struct FileWriteChannel {
 
     /// Flush the output.
     void flush() @safe {
-        out_.flush();
+        file.flush();
     }
 
     /// Close the write channel.
     void closeWrite() @safe {
-        out_.close;
+        file.close;
     }
 }
 
