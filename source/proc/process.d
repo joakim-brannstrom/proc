@@ -19,6 +19,8 @@ static import std.stdio;
 
 import my.gc.refc;
 import my.from_;
+import my.path;
+import my.named_type;
 
 public import proc.channel;
 public import proc.pid;
@@ -1140,4 +1142,129 @@ void waitUntilChildren(RawPid p, int num) {
             break;
     }
     while (makePidMap.getSubMap(p).remove(p).length < num);
+}
+
+alias Address = NamedType!(ulong, Tag!"Address", ulong.init, TagStringable);
+struct AddressMap {
+    Address begin;
+    Address end;
+    NamedType!(string, Tag!"Permission", string.init, TagStringable) perm;
+}
+
+/** An assoc array mapping the path of each shared library loaded by
+ * the process to the address it is loaded at in the process address space.
+ */
+AddressMap[][AbsolutePath] libs(RawPid pid) nothrow {
+    import std.stdio : File;
+    import std.format : formattedRead, format;
+    import std.algorithm : countUntil;
+    import std.typecons : tuple;
+    import std.string : strip;
+
+    typeof(return) rval;
+
+    try {
+        foreach (l; File(format!"/proc/%s/maps"(pid)).byLine
+                .map!(a => tuple(a, a.countUntil('/')))
+                .filter!(a => a[1] != -1)) {
+            try {
+                auto p = AbsolutePath(l[0][l[1] .. $].idup);
+                auto m = l[0][0 .. l[1]].strip;
+                ulong begin;
+                ulong end;
+                char[] perm;
+                if (formattedRead!"%x-%x %s "(m, begin, end, perm) != 3) {
+                    continue;
+                }
+
+                auto amap = AddressMap(Address(begin), Address(end),
+                        typeof(AddressMap.init.perm)(perm.idup));
+                if (auto v = p in rval) {
+                    *v ~= amap;
+                } else {
+                    rval[p] = [amap];
+                }
+            } catch (Exception e) {
+            }
+        }
+    } catch (Exception e) {
+        logger.trace(e.msg).collectException;
+    }
+
+    return rval;
+}
+
+@("shall read the libraries the process is using")
+unittest {
+    immutable scriptName = makeScript(`#!/bin/bash
+sleep 10m &
+sleep 10m &
+sleep 10m
+`);
+    scope (exit)
+        remove(scriptName);
+
+    auto p = pipeProcess([scriptName]).sandbox.rcKill;
+    waitUntilChildren(p.osHandle, 3);
+    auto res = libs(p.osHandle);
+    p.kill;
+
+    assert(res.length != 0);
+    assert(AbsolutePath("/bin/bash") in res);
+}
+
+/** Parses the output from a run of 'ldd' on a binary.
+ *
+ * Params:
+ *  input = an input range of lines which is the output from ldd
+ *
+ * Example
+ * ---
+ * writeln(parseLddOutput(`
+ *     linux-vdso.so.1 =>  (0x00007fffbf5fe000)
+ *     libtinfo.so.5 => /lib/x86_64-linux-gnu/libtinfo.so.5 (0x00007fe28117f000)
+ *     libdl.so.2 => /lib/x86_64-linux-gnu/libdl.so.2 (0x00007fe280f7b000)
+ *     libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fe280bb4000)
+ *     /lib64/ld-linux-x86-64.so.2 (0x00007fe2813dd000)
+ * `))
+ * ---
+ *
+ * Returns: a dictionary of {path: address} for each library required by the
+ * specified binary.
+ */
+Address[AbsolutePath] parseLddOutput(T)(T input) if (std_.range.isInputRange!T) {
+    import std.regex : regex, matchFirst;
+    import std.format : formattedRead;
+
+    typeof(return) rval;
+    const reLinux = regex(`\s(?P<lib>\S?/\S+)\s+\((?P<addr>0x.+)\)`);
+
+    foreach (l; input) {
+        auto m = matchFirst(l, reLinux);
+        if (m.empty || m.length < 3) {
+            continue;
+        }
+
+        try {
+            ulong addr;
+            formattedRead!"0x%x"(m["addr"], addr);
+            rval[AbsolutePath(m["lib"])] = Address(addr);
+        } catch (Exception e) {
+        }
+    }
+
+    return rval;
+}
+
+@("shall parse the output of ldd")
+unittest {
+    auto res = parseLddOutput([
+            "linux-vdso.so.1 =>  (0x00007fffbf5fe000)",
+            "libtinfo.so.5 => /lib/x86_64-linux-gnu/libtinfo.so.5 (0x00007fe28117f000)",
+            "libdl.so.2 => /lib/x86_64-linux-gnu/libdl.so.2 (0x00007fe280f7b000)",
+            "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fe280bb4000)",
+            "/lib64/ld-linux-x86-64.so.2 (0x00007fe2813dd000)"
+            ]);
+    assert(res.length == 3);
+    assert(res[AbsolutePath("/lib/x86_64-linux-gnu/libtinfo.so.5")].get == 140610805166080);
 }
