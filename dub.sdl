@@ -7,7 +7,7 @@ license "BSL-1.0"
 targetPath "build"
 targetType "library"
 
-dependency "my" version="~>0.0.15"
+dependency "my" version="~>0.0.20"
 
 dflags "-verrors=context" platform="dmd"
 dflags "--verrors-context" platform="ldc"
