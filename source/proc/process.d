@@ -638,7 +638,7 @@ sleep 10m
         // the purpose is to poll the process often "enough" that if it
         // terminates early `Process` detects it fast enough. 1000 is chosen
         // because it "feels good". the purpose
-        auto sleepInterval = min(500, max(20, timeout.total!"msecs" / 1000)).dur!"msecs";
+        auto sleepInterval = min(50, max(1, timeout.total!"msecs" / 1000)).dur!"msecs";
 
         bool forceStop;
         bool running = true;
