@@ -244,17 +244,17 @@ struct PipeProcess {
     }
 
     /// Access to stdout.
-    FileWriteChannel stdin() nothrow @safe {
+    ref FileWriteChannel stdin() nothrow @safe return {
         return stdin_;
     }
 
     /// Access to stdout.
-    FileReadChannel stdout() nothrow @safe {
+    ref FileReadChannel stdout() nothrow @safe return {
         return stdout_;
     }
 
     /// Access stderr.
-    FileReadChannel stderr() nothrow @safe {
+    ref FileReadChannel stderr() nothrow @safe return {
         return stderr_;
     }
 
