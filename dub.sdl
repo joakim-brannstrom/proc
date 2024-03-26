@@ -7,10 +7,8 @@ license "BSL-1.0"
 targetPath "build"
 targetType "library"
 
-dependency "my" version="~>0.0.33"
+dependency "mylib" version="~>0.0.41"
 
-dflags "-verrors=context" platform="dmd"
-dflags "--verrors-context" platform="ldc"
 libs "util"
 
 configuration "library" {
