@@ -7,7 +7,7 @@ license "BSL-1.0"
 targetPath "build"
 targetType "library"
 
-dependency "mylib" version="~>1.0.0"
+dependency "mylib" version="~>1"
 
 libs "util"
 
@@ -15,6 +15,5 @@ configuration "library" {
 }
 
 configuration "unittest" {
-    dependency "silly" version="~>1.0.2"
-    dependency "beep" version="~>0.0.2"
+    dependency "nusilly" version="~>1.0"
 }
